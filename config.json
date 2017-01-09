@@ -1,0 +1,5 @@
+{
+	"DisabledTests": {
+		"*Client-*-SSL3": "SSLv3 not supported as a client"
+	}
+}
