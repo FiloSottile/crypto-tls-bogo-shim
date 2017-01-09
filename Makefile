@@ -1,5 +1,7 @@
+GO := $(CURDIR)/vendor/github.com/cloudflare/tls-tris/_dev/go.sh
+
 bin/crypto-tls-bogo-shim: *.go
-	GOBIN=$(CURDIR)/bin go1.8beta2 install .
+	GOBIN=$(CURDIR)/bin $(GO) install .
 
 .PHONY: run
 run: bin/crypto-tls-bogo-shim

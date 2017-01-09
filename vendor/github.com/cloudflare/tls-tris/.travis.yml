@@ -1,0 +1,43 @@
+sudo: required
+language: go
+
+services:
+  - docker
+
+go:
+  - 1.7
+
+env:
+  - MODE=interop CLIENT=boring
+  - MODE=interop CLIENT=bogo
+  - MODE=interop CLIENT=tstclnt
+  - MODE=interop CLIENT=picotls ZRTT=1
+  - MODE=interop CLIENT=mint
+  - MODE=gotest
+  - MODE=interop CLIENT=tstclnt ZRTT=1
+  - MODE=interop CLIENT=boring REVISION=origin/master
+  - MODE=interop CLIENT=tstclnt REVISION=default ZRTT=1
+
+matrix:
+  fast_finish: true
+  allow_failures:
+    - env: MODE=interop CLIENT=boring REVISION=origin/master
+    - env: MODE=interop CLIENT=tstclnt REVISION=default ZRTT=1
+    - env: MODE=interop CLIENT=tstclnt ZRTT=1 # crashes on close_notify in 0.5RTT
+
+install:
+  - if [ "$MODE" = "interop" ]; then ./_dev/tris-localserver/start.sh -d && docker ps -a; fi
+  - if [ "$MODE" = "interop" ]; then ./_dev/interop.sh INSTALL $CLIENT $REVISION; fi
+
+script:
+  - if [ "$MODE" = "interop" ]; then ./_dev/interop.sh RUN $CLIENT; fi
+  - if [ "$MODE" = "interop" ] && [ "$ZRTT" = "1" ]; then ./_dev/interop.sh 0-RTT $CLIENT; fi
+  - if [ "$MODE" = "gotest" ]; then ./_dev/go.sh test -race crypto/tls; fi
+
+after_script:
+  - if [ "$MODE" = "interop" ]; then docker ps -a; docker logs tris-localserver; fi
+
+cache:
+  directories:
+    - _dev/GOROOT
+    - _dev/go
