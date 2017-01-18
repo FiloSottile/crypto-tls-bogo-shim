@@ -40,6 +40,7 @@ func main() {
 
 	config := &tls.Config{
 		MinVersion:         tls.VersionSSL30,
+		MaxVersion:         tls.VersionTLS13,
 		InsecureSkipVerify: true,
 	}
 

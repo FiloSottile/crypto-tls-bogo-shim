@@ -1,0 +1,54 @@
+diff --git a/vendor/github.com/google/boringssl/ssl/test/runner/runner.go b/vendor/github.com/google/boringssl/ssl/test/runner/runner.go
+index ba78fce..b24fa74 100644
+--- a/vendor/github.com/google/boringssl/ssl/test/runner/runner.go
++++ b/vendor/github.com/google/boringssl/ssl/test/runner/runner.go
+@@ -1059,6 +1059,10 @@ func runTest(test *testCase, shimPath string, mallocNumToFail int64) error {
+ 		return fmt.Errorf("valgrind error:\n%s\n%s", stderr, extraStderr)
+ 	}
+ 
++	if *flagDebug {
++		fmt.Fprintf(os.Stderr, "\nstdout:\n%s\nstderr:\n%s\n%s", stdout, stderr, extraStderr)
++	}
++
+ 	return nil
+ }
+ 
+@@ -7964,11 +7968,11 @@ func addCurveTests() {
+ 			MaxVersion: VersionTLS12,
+ 			CipherSuites: []uint16{
+ 				TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+-				TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,
++				TLS_RSA_WITH_AES_128_GCM_SHA256,
+ 			},
+ 			CurvePreferences: []CurveID{CurveP224},
+ 		},
+-		expectedCipher: TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,
++		expectedCipher: TLS_RSA_WITH_AES_128_GCM_SHA256,
+ 	})
+ 
+ 	// The client must reject bogus curves and disabled curves.
+@@ -10132,7 +10136,7 @@ type statusMsg struct {
+ }
+ 
+ func statusPrinter(doneChan chan *testOutput, statusChan chan statusMsg, total int) {
+-	var started, done, failed, unimplemented, lineLen int
++	var passed, started, done, failed, unimplemented, lineLen int
+ 
+ 	testOutput := newTestOutput()
+ 	for msg := range statusChan {
+@@ -10168,13 +10172,14 @@ func statusPrinter(doneChan chan *testOutput, statusChan chan statusMsg, total i
+ 					// Print each test instead of a status line.
+ 					fmt.Printf("PASSED (%s)\n", msg.test.name)
+ 				}
++				passed++
+ 				testOutput.addResult(msg.test.name, "PASS")
+ 			}
+ 		}
+ 
+ 		if !*pipe {
+ 			// Print a new status line.
+-			line := fmt.Sprintf("%d/%d/%d/%d/%d", failed, unimplemented, done, started, total)
++			line := fmt.Sprintf("F:%d/U:%d/P:%d/D:%d/S:%d/T:%d", failed, unimplemented, passed, done, started, total)
+ 			lineLen = len(line)
+ 			os.Stdout.WriteString(line)
+ 		}
