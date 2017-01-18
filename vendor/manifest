@@ -2,15 +2,6 @@
 	"generator": "github.com/FiloSottile/gvt",
 	"dependencies": [
 		{
-			"importpath": "github.com/cloudflare/tls-tris",
-			"repository": "https://github.com/cloudflare/tls-tris",
-			"vcs": "git",
-			"revision": "fb83a6ebb7432e8dbbcf7e186426e58a4c253c96",
-			"branch": "master",
-			"notests": true,
-			"allfiles": true
-		},
-		{
 			"importpath": "github.com/google/boringssl/ssl/test",
 			"repository": "https://github.com/google/boringssl",
 			"vcs": "git",
