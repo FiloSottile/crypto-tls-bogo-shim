@@ -18,6 +18,8 @@
 		"DuplicateKeyShares": "TODO",
 		"SkipEarlyData-TooMuchData": "TODO",
 
+		"Renegotiate-Server-Forbidden": "9b812d006d made OpenSSL tests lock up",
+
 		"*V2ClientHello*": "Yeah, no.",
 		"*SSL3*": "Fuck that.",
 		"*SSLv3*": "Really."
