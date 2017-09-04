@@ -14,6 +14,7 @@
 		"DuplicateExtensionServer-*": "TODO",
 		"DuplicateKeyShares": "TODO",
 		"SkipEarlyData-TooMuchData": "TODO",
+		"KeyUpdate-*": "TODO",
 
 		"Renegotiate-Server-Forbidden": "9b812d006d made OpenSSL tests lock up",
 
