@@ -26,8 +26,39 @@ const (
 	VersionTLS13 = 0x0304
 )
 
+const (
+	VersionDTLS10 = 0xfeff
+	VersionDTLS12 = 0xfefd
+)
+
 // A draft version of TLS 1.3 that is sent over the wire for the current draft.
-const tls13DraftVersion = 0x7f12
+const (
+	tls13DraftVersion                = 0x7f12
+	tls13ExperimentVersion           = 0x7e01
+	tls13RecordTypeExperimentVersion = 0x7a12
+)
+
+const (
+	TLS13Default               = 0
+	TLS13Experiment            = 1
+	TLS13RecordTypeExperiment  = 2
+	TLS13NoSessionIDExperiment = 3
+)
+
+var allTLSWireVersions = []uint16{
+	tls13DraftVersion,
+	tls13ExperimentVersion,
+	tls13RecordTypeExperimentVersion,
+	VersionTLS12,
+	VersionTLS11,
+	VersionTLS10,
+	VersionSSL30,
+}
+
+var allDTLSWireVersions = []uint16{
+	VersionDTLS12,
+	VersionDTLS10,
+}
 
 const (
 	maxPlaintext        = 16384        // maximum plaintext payload length
@@ -44,10 +75,11 @@ const (
 type recordType uint8
 
 const (
-	recordTypeChangeCipherSpec recordType = 20
-	recordTypeAlert            recordType = 21
-	recordTypeHandshake        recordType = 22
-	recordTypeApplicationData  recordType = 23
+	recordTypeChangeCipherSpec   recordType = 20
+	recordTypeAlert              recordType = 21
+	recordTypeHandshake          recordType = 22
+	recordTypeApplicationData    recordType = 23
+	recordTypePlaintextHandshake recordType = 24
 )
 
 // TLS handshake message types.
@@ -100,7 +132,6 @@ const (
 	extensionNextProtoNeg               uint16 = 13172 // not IANA assigned
 	extensionRenegotiationInfo          uint16 = 0xff01
 	extensionChannelID                  uint16 = 30032 // not IANA assigned
-	extensionShortHeader                uint16 = 27463 // not IANA assigned
 )
 
 // TLS signaling cipher suite values
@@ -185,6 +216,7 @@ var supportedSignatureAlgorithms = []signatureAlgorithm{
 	signatureECDSAWithP256AndSHA256,
 	signatureRSAPKCS1WithSHA1,
 	signatureECDSAWithSHA1,
+	signatureEd25519,
 }
 
 // SRTP protection profiles (See RFC 5764, section 4.1.2)
@@ -223,7 +255,6 @@ type ConnectionState struct {
 	SCTList                    []byte                // signed certificate timestamp list
 	PeerSignatureAlgorithm     signatureAlgorithm    // algorithm used by the peer in the handshake
 	CurveID                    CurveID               // the curve used in ECDHE
-	ShortHeader                bool                  // whether the short header extension was negotiated
 }
 
 // ClientAuthType declares the policy the server will follow for
@@ -251,9 +282,11 @@ type ClientSessionState struct {
 	extendedMasterSecret bool                // Whether an extended master secret was used to generate the session
 	sctList              []byte
 	ocspResponse         []byte
+	earlyALPN            string
 	ticketCreationTime   time.Time
 	ticketExpiration     time.Time
 	ticketAgeAdd         uint32
+	maxEarlyDataSize     uint32
 }
 
 // ClientSessionCache is a cache of ClientSessionState objects that can be used
@@ -385,6 +418,9 @@ type Config struct {
 	// which is currently TLS 1.2.
 	MaxVersion uint16
 
+	// TLS13Variant is the variant of TLS 1.3 to use.
+	TLS13Variant int
+
 	// CurvePreferences contains the elliptic curves that will be used in
 	// an ECDHE handshake, in preference order. If empty, the default will
 	// be used.
@@ -412,6 +448,13 @@ type Config struct {
 	// PreSharedKeyIdentity, if not empty, is the identity to use
 	// with the PSK cipher suites.
 	PreSharedKeyIdentity string
+
+	// MaxEarlyDataSize controls the maximum number of bytes that the
+	// server will accept in early data and advertise in a
+	// NewSessionTicketMsg. If 0, no early data will be accepted and
+	// the TicketEarlyDataInfo extension in the NewSessionTicketMsg
+	// will be omitted.
+	MaxEarlyDataSize uint32
 
 	// SRTPProtectionProfiles, if not nil, is the list of SRTP
 	// protection profiles to offer in DTLS-SRTP.
@@ -526,6 +569,14 @@ type ProtocolBugs struct {
 	// message.
 	SkipFinished bool
 
+	// SkipEndOfEarlyData causes the implementation to skip the
+	// end_of_early_data alert.
+	SkipEndOfEarlyData bool
+
+	// SkipCertificateVerify, if true causes peer to skip sending a
+	// CertificateVerify message after the Certificate message.
+	SkipCertificateVerify bool
+
 	// EarlyChangeCipherSpec causes the client to send an early
 	// ChangeCipherSpec message before the ClientKeyExchange. A value of
 	// zero disables this behavior. One and two configure variants for 0.9.8
@@ -536,6 +587,11 @@ type ProtocolBugs struct {
 	// message in DTLS to be prefaced by stray ChangeCipherSpec record. This
 	// may be used to test DTLS's handling of reordered ChangeCipherSpec.
 	StrayChangeCipherSpec bool
+
+	// ReorderChangeCipherSpec causes the ChangeCipherSpec message to be
+	// sent at start of each flight in DTLS. Unlike EarlyChangeCipherSpec,
+	// the cipher change happens at the usual time.
+	ReorderChangeCipherSpec bool
 
 	// FragmentAcrossChangeCipherSpec causes the implementation to fragment
 	// the Finished (or NextProto) message around the ChangeCipherSpec
@@ -613,12 +669,12 @@ type ProtocolBugs struct {
 	SendSupportedVersions []uint16
 
 	// NegotiateVersion, if non-zero, causes the server to negotiate the
-	// specifed TLS version rather than the version supported by either
+	// specifed wire version rather than the version supported by either
 	// peer.
 	NegotiateVersion uint16
 
 	// NegotiateVersionOnRenego, if non-zero, causes the server to negotiate
-	// the specified TLS version on renegotiation rather than retaining it.
+	// the specified wire version on renegotiation rather than retaining it.
 	NegotiateVersionOnRenego uint16
 
 	// ExpectFalseStart causes the server to, on full handshakes,
@@ -660,9 +716,28 @@ type ProtocolBugs struct {
 	// ticket before sending it in a resume handshake.
 	FilterTicket func([]byte) ([]byte, error)
 
-	// OversizedSessionId causes the session id that is sent with a ticket
-	// resumption attempt to be too large (33 bytes).
-	OversizedSessionId bool
+	// TicketSessionIDLength, if non-zero, is the length of the session ID
+	// to send with a ticket resumption offer.
+	TicketSessionIDLength int
+
+	// EmptyTicketSessionID, if true, causes the client to send an empty
+	// session ID with a ticket resumption offer. For simplicity, this will
+	// also cause the client to interpret a ServerHello with empty session
+	// ID as a resumption. (A client which sends empty session ID is
+	// normally expected to look ahead for ChangeCipherSpec.)
+	EmptyTicketSessionID bool
+
+	// SendClientHelloSessionID, if not nil, is the session ID sent in the
+	// ClientHello.
+	SendClientHelloSessionID []byte
+
+	// ExpectClientHelloSessionID, if true, causes the server to fail the
+	// connection if there is not a SessionID in the ClientHello.
+	ExpectClientHelloSessionID bool
+
+	// ExpectEmptyClientHelloSessionID, if true, causes the server to fail the
+	// connection if there is a SessionID in the ClientHello.
+	ExpectEmptyClientHelloSessionID bool
 
 	// ExpectNoTLS12Session, if true, causes the server to fail the
 	// connection if either a session ID or TLS 1.2 ticket is offered.
@@ -691,8 +766,12 @@ type ProtocolBugs struct {
 	EmptyRenegotiationInfo bool
 
 	// BadRenegotiationInfo causes the renegotiation extension value in a
-	// renegotiation handshake to be incorrect.
+	// renegotiation handshake to be incorrect at the start.
 	BadRenegotiationInfo bool
+
+	// BadRenegotiationInfoEnd causes the renegotiation extension value in
+	// a renegotiation handshake to be incorrect at the end.
+	BadRenegotiationInfoEnd bool
 
 	// NoRenegotiationInfo disables renegotiation info support in all
 	// handshakes.
@@ -807,6 +886,10 @@ type ProtocolBugs struct {
 	// and include a copy of the full one.
 	MixCompleteMessageWithFragments bool
 
+	// RetransmitFinished, if true, causes the DTLS Finished message to be
+	// sent twice.
+	RetransmitFinished bool
+
 	// SendInvalidRecordType, if true, causes a record with an invalid
 	// content type to be sent immediately following the handshake.
 	SendInvalidRecordType bool
@@ -859,10 +942,6 @@ type ProtocolBugs struct {
 
 	// BadFinished, if true, causes the Finished hash to be broken.
 	BadFinished bool
-
-	// DHGroupPrime, if not nil, is used to define the (finite field)
-	// Diffie-Hellman group. The generator used is always two.
-	DHGroupPrime *big.Int
 
 	// PackHandshakeFragments, if true, causes handshake fragments in DTLS
 	// to be packed into individual handshake records, up to the specified
@@ -955,11 +1034,6 @@ type ProtocolBugs struct {
 	// receipt of a NewSessionTicket message.
 	ExpectNoNewSessionTicket bool
 
-	// SendTicketEarlyDataInfo, if non-zero, is the maximum amount of data that we
-	// will accept as early data, and gets sent in the ticket_early_data_info
-	// extension of the NewSessionTicket message.
-	SendTicketEarlyDataInfo uint32
-
 	// DuplicateTicketEarlyDataInfo causes an extra empty extension of
 	// ticket_early_data_info to be sent in NewSessionTicket.
 	DuplicateTicketEarlyDataInfo bool
@@ -971,6 +1045,10 @@ type ProtocolBugs struct {
 	// ExpectTicketAge, if non-zero, is the expected age of the ticket that the
 	// server receives from the client.
 	ExpectTicketAge time.Duration
+
+	// SendTicketAge, if non-zero, is the ticket age to be sent by the
+	// client.
+	SendTicketAge time.Duration
 
 	// FailIfSessionOffered, if true, causes the server to fail any
 	// connections where the client offers a non-empty session ID or session
@@ -986,11 +1064,6 @@ type ProtocolBugs struct {
 	// HelloRequest handshake message to be sent before each handshake
 	// message. This only makes sense for a server.
 	SendHelloRequestBeforeEveryHandshakeMessage bool
-
-	// RequireDHPublicValueLen causes a fatal error if the length (in
-	// bytes) of the server's Diffie-Hellman public value is not equal to
-	// this.
-	RequireDHPublicValueLen int
 
 	// BadChangeCipherSpec, if not nil, is the body to be sent in
 	// ChangeCipherSpec records instead of {1}.
@@ -1012,10 +1085,18 @@ type ProtocolBugs struct {
 	// supplied SCT list in resumption handshakes.
 	SendSCTListOnResume []byte
 
+	// SendSCTListOnRenegotiation, if not nil, causes the server to send the
+	// supplied SCT list on renegotiation.
+	SendSCTListOnRenegotiation []byte
+
 	// SendOCSPResponseOnResume, if not nil, causes the server to advertise
 	// OCSP stapling in resumption handshakes and, if applicable, send the
 	// supplied stapled response.
 	SendOCSPResponseOnResume []byte
+
+	// SendOCSPResponseOnResume, if not nil, causes the server to send the
+	// supplied OCSP response on renegotiation.
+	SendOCSPResponseOnRenegotiation []byte
 
 	// SendExtensionOnCertificate, if not nil, causes the runner to send the
 	// supplied bytes in the extensions on the Certificate message.
@@ -1116,9 +1197,13 @@ type ProtocolBugs struct {
 	// SendEarlyAlert, if true, sends a fatal alert after the ClientHello.
 	SendEarlyAlert bool
 
-	// SendEarlyDataLength, if non-zero, is the amount of early data to send after
-	// the ClientHello.
-	SendEarlyDataLength int
+	// SendFakeEarlyDataLength, if non-zero, is the amount of early data to
+	// send after the ClientHello.
+	SendFakeEarlyDataLength int
+
+	// SendStrayEarlyHandshake, if non-zero, causes the client to send a stray
+	// handshake record before sending end of early data.
+	SendStrayEarlyHandshake bool
 
 	// OmitEarlyDataExtension, if true, causes the early data extension to
 	// be omitted in the ClientHello.
@@ -1131,6 +1216,57 @@ type ProtocolBugs struct {
 	// InterleaveEarlyData, if true, causes the TLS 1.3 client to send early
 	// data interleaved with the second ClientHello and the client Finished.
 	InterleaveEarlyData bool
+
+	// SendEarlyData causes a TLS 1.3 client to send the provided data
+	// in application data records immediately after the ClientHello,
+	// provided that the client offers a TLS 1.3 session. It will do this
+	// whether or not the server advertised early data for the ticket.
+	SendEarlyData [][]byte
+
+	// ExpectEarlyDataAccepted causes a TLS 1.3 client to check that early data
+	// was accepted by the server.
+	ExpectEarlyDataAccepted bool
+
+	// AlwaysAcceptEarlyData causes a TLS 1.3 server to always accept early data
+	// regardless of ALPN mismatch.
+	AlwaysAcceptEarlyData bool
+
+	// AlwaysRejectEarlyData causes a TLS 1.3 server to always reject early data.
+	AlwaysRejectEarlyData bool
+
+	// SendEarlyDataExtension, if true, causes a TLS 1.3 server to send the
+	// early_data extension in EncryptedExtensions, independent of whether
+	// it was accepted.
+	SendEarlyDataExtension bool
+
+	// ExpectEarlyData causes a TLS 1.3 server to read application
+	// data after the ClientHello (assuming the server is able to
+	// derive the key under which the data is encrypted) before it
+	// sends a ServerHello. It checks that the application data it
+	// reads matches what is provided in ExpectEarlyData and errors if
+	// the number of records or their content do not match.
+	ExpectEarlyData [][]byte
+
+	// ExpectLateEarlyData causes a TLS 1.3 server to read application
+	// data after the ServerFinished (assuming the server is able to
+	// derive the key under which the data is encrypted) before it
+	// sends the ClientFinished. It checks that the application data it
+	// reads matches what is provided in ExpectLateEarlyData and errors if
+	// the number of records or their content do not match.
+	ExpectLateEarlyData [][]byte
+
+	// SendHalfRTTData causes a TLS 1.3 server to send the provided
+	// data in application data records before reading the client's
+	// Finished message.
+	SendHalfRTTData [][]byte
+
+	// ExpectHalfRTTData causes a TLS 1.3 client, if 0-RTT was accepted, to
+	// read application data after reading the server's Finished message and
+	// before sending any subsequent handshake messages. It checks that the
+	// application data it reads matches what is provided in
+	// ExpectHalfRTTData and errors if the number of records or their
+	// content do not match.
+	ExpectHalfRTTData [][]byte
 
 	// EmptyEncryptedExtensions, if true, causes the TLS 1.3 server to
 	// emit an empty EncryptedExtensions block.
@@ -1164,6 +1300,10 @@ type ProtocolBugs struct {
 	// specified value in ServerHello version field.
 	SendServerHelloVersion uint16
 
+	// SendServerSupportedExtensionVersion, if non-zero, causes the server to send
+	// the specified value in supported_versions extension in the ServerHello.
+	SendServerSupportedExtensionVersion uint16
+
 	// SkipHelloRetryRequest, if true, causes the TLS 1.3 server to not send
 	// HelloRetryRequest.
 	SkipHelloRetryRequest bool
@@ -1192,6 +1332,10 @@ type ProtocolBugs struct {
 	// SendCompressionMethods, if not nil, is the compression method list to
 	// send in the ClientHello.
 	SendCompressionMethods []byte
+
+	// SendCompressionMethod is the compression method to send in the
+	// ServerHello.
+	SendCompressionMethod byte
 
 	// AlwaysSendPreSharedKeyIdentityHint, if true, causes the server to
 	// always send a ServerKeyExchange for PSK ciphers, even if the identity
@@ -1237,22 +1381,59 @@ type ProtocolBugs struct {
 	// request signed certificate timestamps.
 	NoSignedCertificateTimestamps bool
 
-	// EnableShortHeader, if true, causes the TLS 1.3 short header extension
-	// to be enabled.
-	EnableShortHeader bool
-
-	// AlwaysNegotiateShortHeader, if true, causes the server to always
-	// negotiate the short header extension in ServerHello.
-	AlwaysNegotiateShortHeader bool
-
-	// ClearShortHeaderBit, if true, causes the server to send short headers
-	// without the high bit set.
-	ClearShortHeaderBit bool
-
 	// SendSupportedPointFormats, if not nil, is the list of supported point
 	// formats to send in ClientHello or ServerHello. If set to a non-nil
 	// empty slice, no extension will be sent.
 	SendSupportedPointFormats []byte
+
+	// MaxReceivePlaintext, if non-zero, is the maximum plaintext record
+	// length accepted from the peer.
+	MaxReceivePlaintext int
+
+	// SendTicketLifetime, if non-zero, is the ticket lifetime to send in
+	// NewSessionTicket messages.
+	SendTicketLifetime time.Duration
+
+	// SendServerNameAck, if true, causes the server to acknowledge the SNI
+	// extension.
+	SendServerNameAck bool
+
+	// ExpectCertificateReqNames, if not nil, contains the list of X.509
+	// names that must be sent in a CertificateRequest from the server.
+	ExpectCertificateReqNames [][]byte
+
+	// RenegotiationCertificate, if not nil, is the certificate to use on
+	// renegotiation handshakes.
+	RenegotiationCertificate *Certificate
+
+	// UseLegacySigningAlgorithm, if non-zero, is the signature algorithm
+	// to use when signing in TLS 1.1 and earlier where algorithms are not
+	// negotiated.
+	UseLegacySigningAlgorithm signatureAlgorithm
+
+	// SendServerHelloAsHelloRetryRequest, if true, causes the server to
+	// send ServerHello messages with a HelloRetryRequest type field.
+	SendServerHelloAsHelloRetryRequest bool
+
+	// RejectUnsolicitedKeyUpdate, if true, causes all unsolicited
+	// KeyUpdates from the peer to be rejected.
+	RejectUnsolicitedKeyUpdate bool
+
+	// OmitExtensions, if true, causes the extensions field in ClientHello
+	// and ServerHello messages to be omitted.
+	OmitExtensions bool
+
+	// EmptyExtensions, if true, causes the extensions field in ClientHello
+	// and ServerHello messages to be present, but empty.
+	EmptyExtensions bool
+
+	// ExpectOmitExtensions, if true, causes the client to reject
+	// ServerHello messages that do not omit extensions.
+	ExpectOmitExtensions bool
+
+	// ExpectRecordSplitting, if true, causes application records to only be
+	// accepted if they follow a 1/n-1 record split.
+	ExpectRecordSplitting bool
 }
 
 func (c *Config) serverInit() {
@@ -1353,10 +1534,35 @@ func (c *Config) defaultCurves() map[CurveID]bool {
 	return defaultCurves
 }
 
-// isSupportedVersion returns true if the specified protocol version is
-// acceptable.
-func (c *Config) isSupportedVersion(vers uint16, isDTLS bool) bool {
-	return c.minVersion(isDTLS) <= vers && vers <= c.maxVersion(isDTLS)
+// isSupportedVersion checks if the specified wire version is acceptable. If so,
+// it returns true and the corresponding protocol version. Otherwise, it returns
+// false.
+func (c *Config) isSupportedVersion(wireVers uint16, isDTLS bool) (uint16, bool) {
+	if (c.TLS13Variant != TLS13Experiment && c.TLS13Variant != TLS13NoSessionIDExperiment && wireVers == tls13ExperimentVersion) ||
+		(c.TLS13Variant != TLS13RecordTypeExperiment && wireVers == tls13RecordTypeExperimentVersion) ||
+		(c.TLS13Variant != TLS13Default && wireVers == tls13DraftVersion) {
+		return 0, false
+	}
+
+	vers, ok := wireToVersion(wireVers, isDTLS)
+	if !ok || c.minVersion(isDTLS) > vers || vers > c.maxVersion(isDTLS) {
+		return 0, false
+	}
+	return vers, true
+}
+
+func (c *Config) supportedVersions(isDTLS bool) []uint16 {
+	versions := allTLSWireVersions
+	if isDTLS {
+		versions = allDTLSWireVersions
+	}
+	var ret []uint16
+	for _, vers := range versions {
+		if _, ok := c.isSupportedVersion(vers, isDTLS); ok {
+			ret = append(ret, vers)
+		}
+	}
+	return ret
 }
 
 // getCertificateForName returns the best certificate for the given name,
@@ -1632,3 +1838,12 @@ var (
 	downgradeTLS13 = []byte{0x44, 0x4f, 0x57, 0x4e, 0x47, 0x52, 0x44, 0x01}
 	downgradeTLS12 = []byte{0x44, 0x4f, 0x57, 0x4e, 0x47, 0x52, 0x44, 0x00}
 )
+
+func containsGREASE(values []uint16) bool {
+	for _, v := range values {
+		if isGREASEValue(v) {
+			return true
+		}
+	}
+	return false
+}

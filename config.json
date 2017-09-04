@@ -6,10 +6,7 @@
 
 		"SupportTicketsWithSessionID": "Session IDs not supported",
 		"*-NoTickets-*": "Session IDs not supported",
-		"*-CHACHA20-POLY1305-OLD-*": "CHACHA20-POLY1305-OLD not supported",
 		"*-AES256-SHA384-*": "AES256-CBC-SHA384 not supported",
-		"*-AES256-SHA256-*": "AES256-CBC-SHA256 not supported",
-		"*-DHE-*": "Finite field DHE not supported",
 
 		"BadRSAClientKeyExchange-4": "See comment in processClientKeyExchange",
 

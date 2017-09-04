@@ -1,11 +1,11 @@
 {
-	"generator": "github.com/FiloSottile/gvt",
+	"version": 0,
 	"dependencies": [
 		{
 			"importpath": "github.com/google/boringssl/ssl/test",
 			"repository": "https://github.com/google/boringssl",
 			"vcs": "git",
-			"revision": "9c33ae85621ef8e00a42309b5101e0bedd02b816",
+			"revision": "74795b32c60104939f4c410a47e22b3027e98d06",
 			"branch": "master",
 			"path": "/ssl/test",
 			"notests": true,
