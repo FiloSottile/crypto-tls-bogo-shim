@@ -53,7 +53,7 @@ func main() {
 	}
 
 	for i := 0; i < *resumeCount+1; i++ {
-		conn, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", *port))
+		conn, err := net.Dial("tcp", net.JoinHostPort("localhost", *port))
 		if err != nil {
 			log.Fatal(err)
 		}
