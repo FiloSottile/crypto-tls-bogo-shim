@@ -32,7 +32,7 @@ func main() {
 			os.Exit(89)
 		}
 	}
-	if *dtls || !*server {
+	if *dtls {
 		os.Exit(89)
 	}
 
