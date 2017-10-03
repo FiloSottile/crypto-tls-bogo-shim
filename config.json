@@ -77,8 +77,8 @@
 
 		"ECDSAKeyUsage-*": "client: TODO reject cert with invalid KU",
 
-		"*V2ClientHello*": "Yeah, no.",
-		"*SSL3*": "Fuck that.",
-		"*SSLv3*": "Really."
+		"*V2ClientHello*": "Unsupported version",
+		"*SSL3*": "Unsupported version",
+		"*SSLv3*": "Unsupported version"
 	}
 }
