@@ -25,8 +25,6 @@
 		"SendBogusAlertType": "client: TODO send IllegalParam instead of UnexpectedMessage",
 		"SkipNewSessionTicket": "client: TODO enable session cache",
 		"InvalidCompressionMethod": "client: TODO send IllegalParam instead of UnexpectedMessage",
-		"LargeMessage": "client: bogo violates draft -21 and sends a too large message",
-		"TLS13-AEAD-*-LargeRecord": "client: bogo violates draft -21 and sends a too large message",
 		"NoClientCertificate-TLS13": "client: TODO implement client certs",
 		"TLS13-Client-CertAuth-*": "client: TODO implement client certs",
 		"SupportedVersionSelection-TLS12": "client: TODO send Unexpected Extension if server sends SV",
