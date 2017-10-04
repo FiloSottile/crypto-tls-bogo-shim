@@ -59,7 +59,6 @@
 		"Basic-Client-*":"client: TODO implement resumption",
 		"TLS13-1RTT-Client-*": "client: TODO implement resumption",
 
-		"PartialEncryptedExtensionsWithServerHello": "client: TODO prevent overlap SH and EE exts",
 		"WrongMessageType-*": "client: TODO expected different alert",
 		"TrailingMessageData-*": "client: TODO expected different alert",
 		"EncryptedExtensionsWithKeyShare": "client: TODO reject invalid extension",
