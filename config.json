@@ -55,7 +55,7 @@
 		"TLS13-TestBadTicketAge-Client": "client: TODO implement resumption",
 		"TLS13-DuplicateTicketEarlyDataInfo": "client: TODO implement resumption",
 
-		"TLS13-WrongOuterRecord": "client: TODO reject wrong content type",
+		"TLS13-WrongOuterRecord": "client: checking record content type is not a MUST",
 		"Basic-Client-*":"client: TODO implement resumption",
 		"TLS13-1RTT-Client-*": "client: TODO implement resumption",
 
