@@ -46,6 +46,14 @@ func main() {
 		InsecureSkipVerify: true,
 	}
 
+	if keyLogFile := os.Getenv("SSLKEYLOGFILE"); config.KeyLogWriter == nil && keyLogFile != "" {
+		var err error
+		config.KeyLogWriter, err = os.OpenFile(keyLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			log.Fatalf("Cannot open keylog file: %v", err)
+		}
+	}
+
 	if *keyFile != "" {
 		cert, err := tls.LoadX509KeyPair(*certFile, *keyFile)
 		if err != nil {
