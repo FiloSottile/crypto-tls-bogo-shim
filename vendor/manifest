@@ -5,7 +5,7 @@
 			"importpath": "github.com/google/boringssl/ssl/test",
 			"repository": "https://github.com/google/boringssl",
 			"vcs": "git",
-			"revision": "74795b32c60104939f4c410a47e22b3027e98d06",
+			"revision": "855d5046c7899f19e2fad6ac83504a40cd92c6cc",
 			"branch": "master",
 			"path": "/ssl/test",
 			"notests": true,
