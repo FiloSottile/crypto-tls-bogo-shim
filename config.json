@@ -43,11 +43,11 @@
 		"ClientAuth-*-TLS13*": "client: TODO implement client certs",
 		"ClientAuth-SHA1-Fallback-*": "client: what to do on empty SigAlg ext?",
 
-		"RSA-PSS-Default-Verify": "client: TODO enable PSS by default for TLS 1.2",
+		"RSA-PSS-Default-*": "TODO enable PSS by default for TLS 1.2",
 		"ECDSACurveMismatch-Verify-TLS13": "client: we do advertise the SigAlg by default",
 		"Ed25519DefaultDisable-NoAccept": "client: expected IllegalParam instead of Unsupported Cert",
 		"UnofferedExtension-Client*": "client: TODO reject unadvertised extension",
-		"UnknownExtension-Client*": "client: TODO reject unadvertised extension",
+		"Unknown*Extension-Client*": "client: TODO reject unadvertised extension",
 		"PointFormat-EncryptedExtensions-TLS13": "client: TODO reject forbidden extension",
 		"PointFormat-Client-MissingUncompressed": "client: TODO should reject",
 		"TLS13-TestBadTicketAge-Client": "client: TODO implement resumption",
