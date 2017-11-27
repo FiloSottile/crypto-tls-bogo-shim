@@ -71,6 +71,8 @@
 
 		"ECDSAKeyUsage-*": "client: TODO reject cert with invalid KU",
 
+		"SupportedVersionSelection-TLS13": "won't fix for now, D22 will use this extension in ServerHello",
+
 		"*V2ClientHello*": "Unsupported version",
 		"*SSL3*": "Unsupported version",
 		"*SSLv3*": "Unsupported version"
