@@ -8,7 +8,8 @@
 		"*-NoTickets-*": "Session IDs not supported",
 		"*-AES256-SHA384-*": "AES256-CBC-SHA384 not supported",
 
-		"BadRSAClientKeyExchange-4": "See comment in processClientKeyExchange",
+		"BadRSAClientKeyExchange-4": "case RSABadValueWrongVersion1 - See comment in processClientKeyExchange",
+		"BadRSAClientKeyExchange-5": "case RSABadValueWrongVersion2 - See comment in processClientKeyExchange",
 
 		"GREASE-Server-TLS13": "TODO",
 		"DuplicateExtensionServer-*": "TODO",
