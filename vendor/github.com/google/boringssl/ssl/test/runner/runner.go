@@ -540,6 +540,7 @@ func doExchange(test *testCase, config *Config, conn net.Conn, isResume bool, tr
 	if test.tls13Variant != 0 {
 		config.TLS13Variant = test.tls13Variant
 	}
+	config.TLS13Variant = TLS13Draft22
 
 	conn = &timeoutConn{conn, *idleTimeout}
 
@@ -1298,46 +1299,11 @@ var tlsVersions = []tlsVersion{
 		versionDTLS: VersionDTLS12,
 	},
 	{
-		name:         "TLS13",
-		version:      VersionTLS13,
-		excludeFlag:  "-no-tls13",
-		versionWire:  tls13DraftVersion,
-		tls13Variant: TLS13Default,
-	},
-	{
-		name:         "TLS13Draft21",
-		version:      VersionTLS13,
-		excludeFlag:  "-no-tls13",
-		versionWire:  tls13Draft21Version,
-		tls13Variant: TLS13Draft21,
-	},
-	{
 		name:         "TLS13Draft22",
 		version:      VersionTLS13,
 		excludeFlag:  "-no-tls13",
 		versionWire:  tls13Draft22Version,
 		tls13Variant: TLS13Draft22,
-	},
-	{
-		name:         "TLS13Experiment",
-		version:      VersionTLS13,
-		excludeFlag:  "-no-tls13",
-		versionWire:  tls13ExperimentVersion,
-		tls13Variant: TLS13Experiment,
-	},
-	{
-		name:         "TLS13Experiment2",
-		version:      VersionTLS13,
-		excludeFlag:  "-no-tls13",
-		versionWire:  tls13Experiment2Version,
-		tls13Variant: TLS13Experiment2,
-	},
-	{
-		name:         "TLS13Experiment3",
-		version:      VersionTLS13,
-		excludeFlag:  "-no-tls13",
-		versionWire:  tls13Experiment3Version,
-		tls13Variant: TLS13Experiment3,
 	},
 }
 
@@ -5485,7 +5451,7 @@ func addVersionNegotiationTests() {
 		config: Config{
 			MaxVersion: VersionTLS13,
 			Bugs: ProtocolBugs{
-				SendServerSupportedExtensionVersion: tls13DraftVersion,
+				SendServerSupportedExtensionVersion: tls13Draft22Version,
 			},
 		},
 		shouldFail:    true,
@@ -5499,7 +5465,7 @@ func addVersionNegotiationTests() {
 		name:     "IgnoreClientVersionOrder",
 		config: Config{
 			Bugs: ProtocolBugs{
-				SendSupportedVersions: []uint16{VersionTLS12, tls13DraftVersion},
+				SendSupportedVersions: []uint16{VersionTLS12, tls13Draft22Version},
 			},
 		},
 		expectedVersion: VersionTLS13,
