@@ -19,6 +19,8 @@ func main() {
 		keyFile     = fs.String("key-file", "", "")
 		certFile    = fs.String("cert-file", "", "")
 		resumeCount = fs.Int("resume-count", 0, "")
+		minVersion  = fs.Int("min-version", tls.VersionSSL30, "")
+		maxVersion  = fs.Int("max-version", tls.VersionTLS13, "")
 	)
 
 	fmt.Println("Args:", os.Args[1:])
@@ -30,7 +32,7 @@ func main() {
 			os.Exit(89)
 		}
 	}
-	if *dtls || !*server {
+	if *dtls {
 		os.Exit(89)
 	}
 
@@ -39,9 +41,17 @@ func main() {
 	}
 
 	config := &tls.Config{
-		MinVersion:         tls.VersionSSL30,
-		MaxVersion:         tls.VersionTLS13,
+		MinVersion:         uint16(*minVersion),
+		MaxVersion:         uint16(*maxVersion),
 		InsecureSkipVerify: true,
+	}
+
+	if keyLogFile := os.Getenv("SSLKEYLOGFILE"); config.KeyLogWriter == nil && keyLogFile != "" {
+		var err error
+		config.KeyLogWriter, err = os.OpenFile(keyLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			log.Fatalf("Cannot open keylog file: %v", err)
+		}
 	}
 
 	if *keyFile != "" {
